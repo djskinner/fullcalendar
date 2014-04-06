@@ -1,6 +1,6 @@
 
  
-function Calendar(element, options, eventSources) {
+function Calendar(element, options, eventSources, resourceSources) {
 	var t = this;
 	
 	
@@ -12,6 +12,9 @@ function Calendar(element, options, eventSources) {
 	t.reportEvents = reportEvents;
 	t.reportEventChange = reportEventChange;
 	t.rerenderEvents = rerenderEvents;
+	t.refetchResources = refetchResources;
+	t.reportResources = reportResources;
+	t.reportResourceChange = reportResourceChange;
 	t.changeView = changeView;
 	t.select = select;
 	t.unselect = unselect;
@@ -32,9 +35,11 @@ function Calendar(element, options, eventSources) {
 	
 	// imports
 	EventManager.call(t, options, eventSources);
+	ResourceManager.call(t, options, resourceSources);
 	var isFetchNeeded = t.isFetchNeeded;
 	var fetchEvents = t.fetchEvents;
 	
+	var fetchResources = t.fetchResources;
 	
 	// locals
 	var _element = element[0];
@@ -49,6 +54,7 @@ function Calendar(element, options, eventSources) {
 	var ignoreWindowResize = 0;
 	var date = new Date();
 	var events = [];
+	var resources = [];
 	var _dragElement;
 	
 	
@@ -73,6 +79,8 @@ function Calendar(element, options, eventSources) {
 	
 	
 	function initialRender() {
+		fetchResources();
+
 		tm = options.theme ? 'ui' : 'fc';
 		element.addClass('fc');
 		if (options.isRTL) {
@@ -204,7 +212,7 @@ function Calendar(element, options, eventSources) {
 		}
 
 		freezeContentHeight();
-		currentView.render(date, inc || 0); // the view's render method ONLY renders the skeleton, nothing else
+		currentView.render(date, inc || 0, resources); // the view's render method ONLY renders the skeleton, nothing else
 		setSize();
 		unfreezeContentHeight();
 		(currentView.afterRender || noop)();
@@ -310,7 +318,7 @@ function Calendar(element, options, eventSources) {
 	function renderEvents(modifiedEventID) { // TODO: remove modifiedEventID hack
 		if (elementVisible()) {
 			currentView.setEventData(events); // for View.js, TODO: unify with renderEvents
-			currentView.renderEvents(events, modifiedEventID); // actually render the DOM elements
+			currentView.renderEvents(events, resources, modifiedEventID); // actually render the DOM elements
 			currentView.trigger('eventAfterAllRender');
 		}
 	}
@@ -352,6 +360,26 @@ function Calendar(element, options, eventSources) {
 		rerenderEvents(eventID);
 	}
 
+
+	/* Resource Fetching/Rendering
+	-----------------------------------------------------------------------------*/
+
+
+	function refetchResources() { // can be called as an API method
+		fetchResources();
+	}
+
+	// called when resource data arrives
+	function reportResources(_resources) {
+		resources = _resources;
+		if (content) _renderView();
+	}
+
+
+	// called when a single resource's data has been changed
+	function reportResourceChange(resourceID) {
+		// TODO: Implement resource rendering on change
+	}
 
 
 	/* Header Updating

@@ -38,17 +38,22 @@ $.fn.fullCalendar = function(options) {
 		delete options.events;
 	}
 	
-
+	var resourceSources = options.resourceSources || [];
+	delete options.resourceSources;
+	if (options.resources) {
+		resourceSources.push(options.resources);
+		delete options.resources;
+	}
+	
 	options = $.extend(true, {},
 		defaults,
 		(options.isRTL || options.isRTL===undefined && defaults.isRTL) ? rtlDefaults : {},
 		options
 	);
 	
-	
 	this.each(function(i, _element) {
 		var element = $(_element);
-		var calendar = new Calendar(element, options, eventSources);
+		var calendar = new Calendar(element, options, eventSources, resourceSources);
 		element.data('fullCalendar', calendar); // TODO: look into memory leak implications
 		calendar.render();
 	});

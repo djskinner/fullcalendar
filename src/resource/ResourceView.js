@@ -22,7 +22,7 @@ setDefaults({
 // TODO: test liquid width, especially in IE6
 
 
-function AgendaView(element, calendar, viewName) {
+function ResourceView(element, calendar, viewName) {
 	var t = this;
 	
 	
@@ -58,13 +58,14 @@ function AgendaView(element, calendar, viewName) {
 	t.reportDayClick = reportDayClick; // selection mousedown hack
 	t.dragStart = dragStart;
 	t.dragStop = dragStop;
-	
-	
+
+	t.isResourceEditable = isResourceEditable;
+
 	// imports
 	View.call(t, element, calendar, viewName);
 	OverlayManager.call(t);
 	SelectionManager.call(t);
-	AgendaEventRenderer.call(t);
+	ResourceEventRenderer.call(t);
 	var opt = t.opt;
 	var trigger = t.trigger;
 	var renderOverlay = t.renderOverlay;
@@ -77,7 +78,6 @@ function AgendaView(element, calendar, viewName) {
 	var dateToCell = t.dateToCell;
 	var rangeToSegments = t.rangeToSegments;
 	var formatDate = calendar.formatDate;
-	
 	
 	// locals
 	
@@ -127,6 +127,18 @@ function AgendaView(element, calendar, viewName) {
 	var weekNumberTitle;
 	var weekNumberFormat;
 	
+	var resources;
+
+
+	function isResourceEditable(resourceId) {		
+		var _resources = resources;
+		$(_resources).each(function(i, resource) {
+			if (resource.id == resourceId && resource.readonly) {
+				return false;
+			} 
+		});
+		return true;
+	}
 
 	
 	/* Rendering
@@ -134,10 +146,10 @@ function AgendaView(element, calendar, viewName) {
 	
 	
 	disableTextSelection(element.addClass('fc-agenda'));
-	
-	
-	function renderAgenda(c) {
-		colCnt = c;
+
+	function renderAgenda(_resources) {
+		resources = _resources;
+		colCnt = resources.length;
 		updateOptions();
 
 		if (!dayTable) { // first time rendering?
@@ -197,7 +209,7 @@ function AgendaView(element, calendar, viewName) {
 			daySegmentContainer =
 				$("<div class='fc-event-container' style='position:absolute;z-index:8;top:0;left:0'/>")
 					.appendTo(slotLayer);
-		
+
 			s =
 				"<table style='width:100%' class='fc-agenda-allday' cellspacing='0'>" +
 				"<tr>" +
@@ -313,7 +325,10 @@ function AgendaView(element, calendar, viewName) {
 		var date;
 		var html = '';
 		var weekText;
+		var cols;
 		var col;
+		var id;
+		var resourceName;
 
 		html +=
 			"<thead>" +
@@ -337,11 +352,14 @@ function AgendaView(element, calendar, viewName) {
 			html += "<th class='fc-agenda-axis " + headerClass + "'>&nbsp;</th>";
 		}
 
-		for (col=0; col<colCnt; col++) {
+		cols = colCnt == 0 ? 1 : colCnt;
+		for (col=0; col<cols; col++) {
+			if (resources[col]) id = resources[col]['id'];
+			if (resources[col]) resourceName = resources[col]['name'];
 			date = cellToDate(0, col);
 			html +=
-				"<th class='fc-" + dayIDs[date.getDay()] + " fc-col" + col + ' ' + headerClass + "'>" +
-				htmlEscape(formatDate(date, colFormat)) +
+				"<th class='fc-resourceName-" + id + "' fc-" + dayIDs[date.getDay()] + " fc-col" + col + ' ' + headerClass + "'>" +
+				resourceName +
 				"</th>";
 		}
 
@@ -359,6 +377,7 @@ function AgendaView(element, calendar, viewName) {
 		var contentClass = tm + "-widget-content";
 		var date;
 		var today = clearTime(new Date());
+		var cols;
 		var col;
 		var cellsHTML;
 		var cellHTML;
@@ -372,9 +391,10 @@ function AgendaView(element, calendar, viewName) {
 
 		cellsHTML = '';
 
-		for (col=0; col<colCnt; col++) {
+		cols = colCnt == 0 ? 1 : colCnt;
+		for (col=0; col<cols; col++) {
 
-			date = cellToDate(0, col);
+			date = cellToDate(0, 0);
 
 			classNames = [
 				'fc-col' + col,
@@ -738,8 +758,7 @@ function AgendaView(element, calendar, viewName) {
 		return addMinutes(start, opt('defaultEventMinutes'));
 	}
 	
-	
-	
+
 	/* Selection
 	---------------------------------------------------------------------------------*/
 	

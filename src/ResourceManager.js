@@ -7,33 +7,31 @@ var ajaxDefaults = {
 	cache: false
 };
 
-var eventGUID = 1;
+var resourceGUID = 1;
 
 
-function EventManager(options, _sources) {
+function ResourceManager(options, _sources) {
 	var t = this;
 	
 	
 	// exports
-	t.isFetchNeeded = isFetchNeeded;
-	t.fetchEvents = fetchEvents;
-	t.addEventSource = addEventSource;
-	t.removeEventSource = removeEventSource;
-	t.updateEvent = updateEvent;
-	t.renderEvent = renderEvent;
-	t.removeEvents = removeEvents;
-	t.clientEvents = clientEvents;
-	t.normalizeEvent = normalizeEvent;
+	t.fetchResources = fetchResources;
+	t.addResourceSource = addResourceSource;
+	t.removeResourceSource = removeResourceSource;
+	t.updateResource = updateResource;
+	t.removeResources = removeResources;
+	t.clientResources = clientResources;
+	t.normalizeResource = normalizeResource;
 	
 	
 	// imports
 	var trigger = t.trigger;
 	var getView = t.getView;
-	var reportEvents = t.reportEvents;
+	var reportResources = t.reportResources;
 	
 	
 	// locals
-	var stickySource = { events: [] };
+	var stickySource = { resources: [] };
 	var sources = [ stickySource ];
 	var rangeStart, rangeEnd;
 	var currentFetchID = 0;
@@ -43,7 +41,7 @@ function EventManager(options, _sources) {
 	
 	
 	for (var i=0; i<_sources.length; i++) {
-		_addEventSource(_sources[i]);
+		_addResourceSource(_sources[i]);
 	}
 	
 	
@@ -52,54 +50,47 @@ function EventManager(options, _sources) {
 	-----------------------------------------------------------------------------*/
 	
 	
-	function isFetchNeeded(start, end) {
-		return !rangeStart || start < rangeStart || end > rangeEnd;
-	}
-	
-	
-	function fetchEvents(start, end) {
-		rangeStart = start;
-		rangeEnd = end;
+	function fetchResources() {
 		cache = [];
 		var fetchID = ++currentFetchID;
 		var len = sources.length;
 		pendingSourceCnt = len;
 		for (var i=0; i<len; i++) {
-			fetchEventSource(sources[i], fetchID);
+			fetchResourceSource(sources[i], fetchID);
 		}
 	}
 	
 	
-	function fetchEventSource(source, fetchID) {
-		_fetchEventSource(source, function(events) {
+	function fetchResourceSource(source, fetchID) {
+		_fetchResourceSource(source, function(resources) {
 			if (fetchID == currentFetchID) {
-				if (events) {
+				if (resources) {
 
-					if (options.eventDataTransform) {
-						events = $.map(events, options.eventDataTransform);
+					if (options.resourceDataTransform) {
+						resources = $.map(resources, options.resourceDataTransform);
 					}
-					if (source.eventDataTransform) {
-						events = $.map(events, source.eventDataTransform);
+					if (source.resourceDataTransform) {
+						resources = $.map(resources, source.resourceDataTransform);
 					}
-					// TODO: this technique is not ideal for static array event sources.
-					//  For arrays, we'll want to process all events right in the beginning, then never again.
+					// TODO: this technique is not ideal for static array resource sources.
+					//  For arrays, we'll want to process all resources right in the beginning, then never again.
 				
-					for (var i=0; i<events.length; i++) {
-						events[i].source = source;
-						normalizeEvent(events[i]);
+					for (var i=0; i<resources.length; i++) {
+						resources[i].source = source;
+						normalizeResource(resources[i]);
 					}
-					cache = cache.concat(events);
+					cache = cache.concat(resources);
 				}
 				pendingSourceCnt--;
 				if (!pendingSourceCnt) {
-					reportEvents(cache);
+					reportResources(cache);
 				}
 			}
 		});
 	}
 	
 	
-	function _fetchEventSource(source, callback) {
+	function _fetchResourceSource(source, callback) {
 		var i;
 		var fetchers = fc.sourceFetchers;
 		var res;
@@ -111,21 +102,21 @@ function EventManager(options, _sources) {
 			}
 			else if (typeof res == 'object') {
 				// the fetcher returned a new source. process it
-				_fetchEventSource(res, callback);
+				_fetchResourceSource(res, callback);
 				return;
 			}
 		}
-		var events = source.events;
-		if (events) {
-			if ($.isFunction(events)) {
+		var resources = source.resources;
+		if (resources) {
+			if ($.isFunction(resources)) {
 				pushLoading();
-				events(cloneDate(rangeStart), cloneDate(rangeEnd), function(events) {
-					callback(events);
+				resources(function(resources) {
+					callback(resources);
 					popLoading();
 				});
 			}
-			else if ($.isArray(events)) {
-				callback(events);
+			else if ($.isArray(resources)) {
+				callback(resources);
 			}
 			else {
 				callback();
@@ -164,13 +155,13 @@ function EventManager(options, _sources) {
 				pushLoading();
 				$.ajax($.extend({}, ajaxDefaults, source, {
 					data: data,
-					success: function(events) {
-						events = events || [];
+					success: function(resources) {
+						resources = resources || [];
 						var res = applyAll(success, this, arguments);
 						if ($.isArray(res)) {
-							events = res;
+							resources = res;
 						}
-						callback(events);
+						callback(resources);
 					},
 					error: function() {
 						applyAll(error, this, arguments);
@@ -193,18 +184,18 @@ function EventManager(options, _sources) {
 	-----------------------------------------------------------------------------*/
 	
 
-	function addEventSource(source) {
-		source = _addEventSource(source);
+	function addResourceSource(source) {
+		source = _addResourceSource(source);
 		if (source) {
 			pendingSourceCnt++;
-			fetchEventSource(source, currentFetchID); // will eventually call reportEvents
+			fetchResourceSource(source, currentFetchID); // will eventually call reportResources
 		}
 	}
 	
 	
-	function _addEventSource(source) {
+	function _addResourceSource(source) {
 		if ($.isFunction(source) || $.isArray(source)) {
-			source = { events: source };
+			source = { resources: source };
 		}
 		else if (typeof source == 'string') {
 			source = { url: source };
@@ -217,15 +208,15 @@ function EventManager(options, _sources) {
 	}
 	
 
-	function removeEventSource(source) {
+	function removeResourceSource(source) {
 		sources = $.grep(sources, function(src) {
 			return !isSourcesEqual(src, source);
 		});
-		// remove all client events from that source
+		// remove all client resources from that source
 		cache = $.grep(cache, function(e) {
 			return !isSourcesEqual(e.source, source);
 		});
-		reportEvents(cache);
+		reportResources(cache);
 	}
 	
 	
@@ -234,89 +225,53 @@ function EventManager(options, _sources) {
 	-----------------------------------------------------------------------------*/
 	
 	
-	function updateEvent(event) { // update an existing event
-		var i, len = cache.length, e,
-			defaultEventEnd = getView().defaultEventEnd, // getView???
-			startDelta = event.start - event._start,
-			endDelta = event.end ?
-				(event.end - (event._end || defaultEventEnd(event))) // event._end would be null if event.end
-				: 0;                                                      // was null and event was just resized
+	function updateResource(resource) { // update an existing resource
+		var i, len = cache.length, e;
 		for (i=0; i<len; i++) {
 			e = cache[i];
-			if (e._id == event._id && e != event) {
-				e.start = new Date(+e.start + startDelta);
-				if (event.end) {
-					if (e.end) {
-						e.end = new Date(+e.end + endDelta);
-					}else{
-						e.end = new Date(+defaultEventEnd(e) + endDelta);
-					}
-				}else{
-					e.end = null;
-				}
-				e.title = event.title;
-				e.url = event.url;
-				e.allDay = event.allDay;
-				e.className = event.className;
-				e.editable = event.editable;
-				e.color = event.color;
-				e.backgroundColor = event.backgroundColor;
-				e.borderColor = event.borderColor;
-				e.textColor = event.textColor;
-				normalizeEvent(e);
+			if (e._id == resource._id && e != resource) {
+				e.name = resource.name;
+				e.readonly = resource.readonly;
+				normalizeResource(e);
 			}
 		}
-		normalizeEvent(event);
-		reportEvents(cache);
+		normalizeResource(resource);
+		reportResources(cache);
 	}
 	
-	
-	function renderEvent(event, stick) {
-		normalizeEvent(event);
-		if (!event.source) {
-			if (stick) {
-				stickySource.events.push(event);
-				event.source = stickySource;
-			}
-			cache.push(event);
-		}
-		reportEvents(cache);
-	}
-	
-	
-	function removeEvents(filter) {
+	function removeResources(filter) {
 		if (!filter) { // remove all
 			cache = [];
 			// clear all array sources
 			for (var i=0; i<sources.length; i++) {
-				if ($.isArray(sources[i].events)) {
-					sources[i].events = [];
+				if ($.isArray(sources[i].resources)) {
+					sources[i].resources = [];
 				}
 			}
 		}else{
-			if (!$.isFunction(filter)) { // an event ID
+			if (!$.isFunction(filter)) { // a resource ID
 				var id = filter + '';
 				filter = function(e) {
 					return e._id == id;
 				};
 			}
 			cache = $.grep(cache, filter, true);
-			// remove events from array sources
+			// remove resources from array sources
 			for (var i=0; i<sources.length; i++) {
-				if ($.isArray(sources[i].events)) {
-					sources[i].events = $.grep(sources[i].events, filter, true);
+				if ($.isArray(sources[i].resources)) {
+					sources[i].resources = $.grep(sources[i].resources, filter, true);
 				}
 			}
 		}
-		reportEvents(cache);
+		reportResources(cache);
 	}
 	
 	
-	function clientEvents(filter) {
+	function clientResources(filter) {
 		if ($.isFunction(filter)) {
 			return $.grep(cache, filter);
 		}
-		else if (filter) { // an event ID
+		else if (filter) { // a resource ID
 			filter += '';
 			return $.grep(cache, function(e) {
 				return e._id == filter;
@@ -346,37 +301,22 @@ function EventManager(options, _sources) {
 	
 	
 	
-	/* Event Normalization
+	/* Resource Normalization
 	-----------------------------------------------------------------------------*/
 	
 	
-	function normalizeEvent(event) {
-		var source = event.source || {};
-		var ignoreTimezone = firstDefined(source.ignoreTimezone, options.ignoreTimezone);
-		event._id = event._id || (event.id === undefined ? '_fc' + eventGUID++ : event.id + '');
-		if (event.date) {
-			if (!event.start) {
-				event.start = event.date;
-			}
-			delete event.date;
-		}
-		event._start = cloneDate(event.start = parseDate(event.start, ignoreTimezone));
-		event.end = parseDate(event.end, ignoreTimezone);
-		if (event.end && event.end <= event.start) {
-			event.end = null;
-		}
-		event._end = event.end ? cloneDate(event.end) : null;
-		if (event.allDay === undefined) {
-			event.allDay = firstDefined(source.allDayDefault, options.allDayDefault);
-		}
-		if (event.className) {
-			if (typeof event.className == 'string') {
-				event.className = event.className.split(/\s+/);
+	function normalizeResource(resource) {
+		var source = resource.source || {};
+		resource._id = resource._id || (resource.id === undefined ? '_fc' + resourceGUID++ : resource.id + '');
+
+		if (resource.className) {
+			if (typeof resource.className == 'string') {
+				resource.className = resource.className.split(/\s+/);
 			}
 		}else{
-			event.className = [];
+			resource.className = [];
 		}
-		// TODO: if there is no start date, return false to indicate an invalid event
+		// TODO: if there is no id, return false to indicate an invalid resource
 	}
 	
 	
@@ -387,7 +327,7 @@ function EventManager(options, _sources) {
 	
 	function normalizeSource(source) {
 		if (source.className) {
-			// TODO: repeat code, same code for event classNames
+			// TODO: repeat code, same code for resources classNames
 			if (typeof source.className == 'string') {
 				source.className = source.className.split(/\s+/);
 			}
@@ -407,7 +347,7 @@ function EventManager(options, _sources) {
 	
 	
 	function getSourcePrimitive(source) {
-		return ((typeof source == 'object') ? (source.events || source.url) : '') || source;
+		return ((typeof source == 'object') ? (source.resources || source.url) : '') || source;
 	}
 
 
