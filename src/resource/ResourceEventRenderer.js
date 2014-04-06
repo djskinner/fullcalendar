@@ -1,5 +1,5 @@
 
-function AgendaEventRenderer() {
+function ResourceEventRenderer() {
 	var t = this;
 	
 	
@@ -8,7 +8,7 @@ function AgendaEventRenderer() {
 	t.clearEvents = clearEvents;
 	t.slotSegHtml = slotSegHtml;
 	
-	
+
 	// imports
 	DayEventRenderer.call(t);
 	var opt = t.opt;
@@ -49,13 +49,18 @@ function AgendaEventRenderer() {
 	// overrides
 	t.draggableDayEvent = draggableDayEvent;
 
-	
+
+	var isResourceEditable = t.isResourceEditable;
+	var getRowCnt = t.getRowCnt;
+	var getViewName = t.getViewName;
+	var dateCell = t.dateCell;
+	var clearSelection = t.clearSelection;
 	
 	/* Rendering
 	----------------------------------------------------------------------------*/
 	
 
-	function renderEvents(events, modifiedEventId) {
+	function renderEvents(events, resources, modifiedEventId) {
 		var i, len=events.length,
 			dayEvents=[],
 			slotEvents=[];
@@ -72,30 +77,32 @@ function AgendaEventRenderer() {
 			setHeight(); // no params means set to viewHeight
 		}
 
-		renderSlotSegs(compileSlotSegs(slotEvents), modifiedEventId);
+		renderSlotSegs(compileSlotSegs(slotEvents, resources), modifiedEventId);
 	}
-	
-	
+
+
 	function clearEvents() {
 		getDaySegmentContainer().empty();
 		getSlotSegmentContainer().empty();
 	}
 
-	
-	function compileSlotSegs(events) {
+
+	function compileSlotSegs(events, resources) {
 		var colCnt = getColCnt(),
 			minMinute = getMinMinute(),
 			maxMinute = getMaxMinute(),
 			d,
 			visEventEnds = $.map(events, slotEventEnd),
 			i,
+			currentResource,
 			j, seg,
 			colSegs,
 			segs = [];
 
 		for (i=0; i<colCnt; i++) {
+			currentResource = resources[i]._id;
 
-			d = cellToDate(0, i);
+			d = cellToDate(0, 0);
 			addMinutes(d, minMinute);
 
 			colSegs = sliceSegs(
@@ -109,8 +116,17 @@ function AgendaEventRenderer() {
 
 			for (j=0; j<colSegs.length; j++) {
 				seg = colSegs[j];
-				seg.col = i;
-				segs.push(seg);
+
+				// Let's be backwards compatible. If event resource is not array, then we convert it.
+				if (!$.isArray(seg.event.resource)) {
+					seg.event.resource = [seg.event.resource];
+				}
+
+				// if event scheduled to current resource push this seg to segs
+				if($.inArray(currentResource, seg.event.resource) != '-1') {
+					seg.col = i;
+					segs.push(seg);
+				}
 			}
 		}
 
@@ -164,7 +180,7 @@ function AgendaEventRenderer() {
 		}
 	}
 	
-	
+
 	// renders events in the 'time slots' at the bottom
 	// TODO: when we refactor this, when user returns `false` eventRender, don't have empty space
 	// TODO: refactor will include using pixels to detect collisions instead of dates (handy for seg cmp)
@@ -358,28 +374,28 @@ function AgendaEventRenderer() {
 		return html;
 	}
 	
-	
+
 	function bindSlotSeg(event, eventElement, seg) {
 		var timeElement = eventElement.find('div.fc-event-time');
-		if (isEventDraggable(event)) {
+		if (isEventDraggable(event) && isResourceEditable(event.resource)) {
 			draggableSlotEvent(event, eventElement, timeElement);
 		}
-		if (seg.isEnd && isEventResizable(event)) {
+		if (seg.isEnd && isEventResizable(event) && isResourceEditable(event.resource)) {
 			resizableSlotEvent(event, eventElement, timeElement);
 		}
 		eventElementHandlers(event, eventElement);
 	}
 	
 	
-	
+
 	/* Dragging
 	-----------------------------------------------------------------------------------*/
 	
-	
+
 	// when event starts out FULL-DAY
 	// overrides DayEventRenderer's version because it needs to account for dragging elements
 	// to and from the slot area.
-	
+
 	function draggableDayEvent(event, eventElement, seg) {
 		var isStart = seg.isStart;
 		var origWidth;
@@ -472,10 +488,10 @@ function AgendaEventRenderer() {
 			}
 		}
 	}
-	
-	
+
+
 	// when event starts out IN TIMESLOTS
-	
+
 	function draggableSlotEvent(event, eventElement, timeElement) {
 		var coordinateGrid = t.getCoordinateGrid();
 		var colCnt = getColCnt();
@@ -629,8 +645,8 @@ function AgendaEventRenderer() {
 
 	}
 	
-	
-	
+
+
 	/* Resizing
 	--------------------------------------------------------------------------------------*/
 	
@@ -676,9 +692,7 @@ function AgendaEventRenderer() {
 		});
 	}
 	
-
 }
-
 
 
 /* Agenda Event Segment Utilities
@@ -862,6 +876,7 @@ function computeSlotSegCollisions(seg, otherSegs, results) {
 
 // Do these segments occupy the same vertical space?
 function isSlotSegCollision(seg1, seg2) {
+	if (seg1.event.resource != seg2.event.resource) return false;
 	return seg1.end > seg2.start && seg1.start < seg2.end;
 }
 

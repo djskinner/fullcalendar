@@ -1,24 +1,20 @@
 
-fcViews.agendaDay = AgendaDayView;
+fcViews.resourceDay = ResourceDayView;
 
-
-function AgendaDayView(element, calendar) {
+function ResourceDayView(element, calendar) {
 	var t = this;
-	
 	
 	// exports
 	t.render = render;
 	
-	
 	// imports
-	AgendaView.call(t, element, calendar, 'agendaDay');
+	ResourceView.call(t, element, calendar, 'resourceDay');
 	var opt = t.opt;
 	var renderAgenda = t.renderAgenda;
 	var skipHiddenDays = t.skipHiddenDays;
 	var formatDate = calendar.formatDate;
 	
-	
-	function render(date, delta) {
+	function render(date, delta, resources) {
 
 		if (delta) {
 			addDays(date, delta);
@@ -32,9 +28,10 @@ function AgendaDayView(element, calendar) {
 
 		t.start = t.visStart = start;
 		t.end = t.visEnd = end;
-
-		renderAgenda(1);
+		
+		renderAgenda(resources);
 	}
-	
+
+
 
 }
